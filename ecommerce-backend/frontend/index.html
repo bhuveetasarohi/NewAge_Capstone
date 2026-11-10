@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShopSphere · E-Commerce Backend Demo</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🛒%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="signed-out">
+  <header class="topbar">
+    <a class="brand" href="#/shop">🛒 <span>ShopSphere</span></a>
+
+    <nav class="nav" aria-label="Main">
+      <a href="#/shop" data-route="shop">Shop</a>
+      <a href="#/for-you" data-route="for-you" class="auth-only">For you</a>
+      <a href="#/cart" data-route="cart" class="auth-only">
+        Cart <span class="badge" id="cart-count" hidden>0</span>
+      </a>
+      <a href="#/orders" data-route="orders" class="auth-only">Orders</a>
+      <a href="#/notifications" data-route="notifications" class="auth-only">Notifications</a>
+      <a href="#/admin" data-route="admin" class="auth-only">Admin</a>
+    </nav>
+
+    <div class="session">
+      <span class="who" id="whoami"></span>
+      <a href="#/login" class="btn btn-small signed-out-only" id="login-link">Sign in</a>
+      <button class="btn btn-small btn-ghost auth-only" data-action="logout">Log out</button>
+    </div>
+  </header>
+
+  <main id="view" class="container" aria-live="polite">
+    <div class="loading">Loading…</div>
+  </main>
+
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

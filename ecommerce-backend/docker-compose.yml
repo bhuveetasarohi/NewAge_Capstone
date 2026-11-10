@@ -1,0 +1,124 @@
+# ShopSphere / E-Commerce Backend System
+# Start everything:   docker compose up --build
+# Open the app:       http://localhost:8080
+# Stop and wipe data: docker compose down -v
+
+name: ecommerce-backend
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ecommerce
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Runs once, on the first start with an empty volume.
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # ----- Go services ---------------------------------------------------------
+  user-service:
+    build:
+      context: ./services
+      args:
+        SERVICE: user
+    environment: &go-env
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/ecommerce?sslmode=disable
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+    depends_on: &deps
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  product-service:
+    build:
+      context: ./services
+      args:
+        SERVICE: product
+    environment: *go-env
+    depends_on: *deps
+    restart: unless-stopped
+
+  inventory-service:
+    build:
+      context: ./services
+      args:
+        SERVICE: inventory
+    environment: *go-env
+    depends_on: *deps
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: ./services
+      args:
+        SERVICE: order
+    environment:
+      <<: *go-env
+      INVOICE_DIR: /data/invoices
+    volumes:
+      # Read-only: the Order service only serves invoices that the worker wrote.
+      - invoices:/data/invoices:ro
+    depends_on: *deps
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./services
+      args:
+        SERVICE: gateway
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      FRONTEND_DIR: /app/frontend
+      USER_SERVICE_URL: http://user-service:8001
+      PRODUCT_SERVICE_URL: http://product-service:8002
+      INVENTORY_SERVICE_URL: http://inventory-service:8003
+      ORDER_SERVICE_URL: http://order-service:8004
+    volumes:
+      - ./frontend:/app/frontend:ro
+    ports:
+      - "8080:8000"
+    depends_on:
+      - user-service
+      - product-service
+      - inventory-service
+      - order-service
+    restart: unless-stopped
+
+  # ----- Python background workers ------------------------------------------
+  worker:
+    build: ./worker
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/ecommerce?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      INVOICE_DIR: /data/invoices
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-shop@example.com}
+    volumes:
+      - invoices:/data/invoices
+    depends_on: *deps
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  invoices:
